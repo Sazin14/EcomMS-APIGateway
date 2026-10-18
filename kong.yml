@@ -1,0 +1,104 @@
+_format_version: "3.0"
+
+# ---------------------------------------------------------------------------
+# Kong = route management only. No plugins.
+# Auth/authz stay in each service. TLS, rate limiting, body size, security
+# headers and request IDs are handled by nginx in front of Kong.
+#
+# Assumptions:
+#  - Every Laravel service serves routes under /api (routes/api.php), so paths
+#    are forwarded unchanged (strip_path: false).
+#  - host.docker.internal = the machine where the services listen on 8001-8005
+#    (they must bind to 0.0.0.0, not 127.0.0.1).
+#  - InventoryService /internal/* (X-Internal-Key) is NOT exposed; services
+#    call each other directly, not through the gateway.
+# ---------------------------------------------------------------------------
+
+services:
+  # ======================= AuthService :8001 =======================
+  - name: auth-service
+    url: http://host.docker.internal:8001
+    routes:
+      - name: auth-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/auth # staff + customer login/register/refresh/logout
+          - /api/staff # staff management
+
+  # ====================== ProductService :8002 ======================
+  - name: product-service
+    url: http://host.docker.internal:8002
+    routes:
+      - name: product-public-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/categories
+          - /api/products # includes /filters and /{slug}
+      - name: product-admin-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/admin/products
+          - /api/admin/categories
+          - /api/admin/attributes
+          - /api/admin/brands
+          - /api/admin/variants
+          - /api/admin/images
+
+  # ===================== InventoryService :8003 =====================
+  - name: inventory-service
+    url: http://host.docker.internal:8003
+    routes:
+      - name: inventory-public-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/availability
+      - name: inventory-admin-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/admin/warehouses
+          - /api/admin/stock
+          - /api/admin/movements
+          - /api/admin/alerts
+          - /api/admin/preorders
+          - /api/admin/reservations
+          - /api/admin/returns
+          - /api/admin/reports
+          - /api/admin/suppliers
+          - /api/admin/purchase-orders
+
+  # ====================== OrderService :8004 ======================
+  - name: order-service
+    url: http://host.docker.internal:8004
+    routes:
+      - name: order-customer-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/cart
+          - /api/checkout
+          - /api/orders # includes /{order}/cancel and /{order}/returns
+          - /api/preorders
+
+  # Staff operations that live under /api/internal in OrderService
+  # (confirm, process, fulfillments, ship, returns approve/complete, refunds).
+  # Exposed as /api/admin/order-ops/... and rewritten to /api/internal/...
+  # IMPORTANT: OrderService must protect these with staff auth middleware,
+  # because nothing in front of it does. Delete this service if unsure.
+  - name: order-ops
+    url: http://host.docker.internal:8004/api/internal
+    routes:
+      - name: order-ops-routes
+        strip_path: true
+        preserve_host: true
+        paths:
+          - /api/admin/order-ops
+
+  # =================== NotificationService :8005 ===================
+  # No public routes: other services call it directly.
+  - name: notification-service
+    url: http://host.docker.internal:8005
