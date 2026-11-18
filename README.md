@@ -18,18 +18,25 @@ Client → nginx (TLS, rate limits, headers) → Kong (routing only) → service
 | `kong.yml` | Kong routes (declarative config) |
 | `nginx.conf` | Dev nginx config (HTTP only) |
 | `nginx.prod.conf` | Production nginx config (HTTPS) |
+| `kong.prod.yml` | Kong routes with production upstream addresses |
+| `fpm-sidecar/nginx.conf` | HTTP front for the php-fpm-only images (Auth, Product, Order) |
 
 ## Services
 
 | Service | Address (host) | Public paths |
 |---|---|---|
-| AuthService | `:8001` | `/api/auth/*`, `/api/staff/*` |
-| ProductService | `:8002` | `/api/categories`, `/api/products`, `/api/admin/{products,categories,attributes,brands,variants,images}` |
-| InventoryService | `:8003` | `/api/availability`, `/api/admin/{warehouses,stock,movements,alerts,preorders,reservations,returns,reports,suppliers,purchase-orders}` |
-| OrderService | `:8004` | `/api/cart`, `/api/checkout`, `/api/orders`, `/api/preorders`, `/api/admin/order-ops/*` (rewritten to `/api/internal/*`) |
-| NotificationService | `:8005` | none (called by other services directly) |
+| AuthService | `:8001` | `/api/auth/*`, `/api/staff/*`, `/api/roles`, `/api/permissions` |
+| ProductService | `:8002` | `/api/categories`, `/api/products`, `/api/admin/{products,categories,attributes,attribute-values,brands,variants,images}` |
+| InventoryService | `:8003` | `/api/availability`, `/api/admin/{inventory,warehouses,stock,movements,alerts,reservations,reports,suppliers,purchase-orders}` |
+| OrderService | `:8004` | `/api/{cart,checkout,orders,preorders,returns}`, `/api/payments/webhook`, `/api/admin/{orders,preorders,payments,fulfillments,returns,refunds}` |
+| NotificationService | `:8005` | `/api/notifications`, `/api/notification-preferences`, `/api/admin/{notifications,notification-templates,notification-deliveries}` |
 
-`/internal/*` of InventoryService is not exposed through the gateway.
+`/api/internal/*` (service-to-service, `X-Internal-Key`) is never exposed through the gateway.
+`/api/admin/inventory/*` (Inventory pre-order dashboard and stock-return log) is not the same as
+`/api/admin/preorders` and `/api/admin/returns`, which belong to OrderService.
+
+Browser apps (storefront, admin) must call the gateway (`http://localhost:8080/api` in development),
+not the services directly. Each service only accepts the origins in its `CORS_ALLOWED_ORIGINS`.
 
 ## Run locally
 
@@ -80,5 +87,7 @@ Edit `kong.yml`: add a service (or a path under an existing route), then restart
 ## Notes
 
 - Rate limits are set in nginx (10/min on login, register and refresh; 20 req/s per IP elsewhere).
-- Upload limits: 5 MB by default, 20 MB for product image uploads.
+- Body limit: 5 MB (the API takes JSON only; product images are sent as URLs).
+- Production upstreams are in `kong.prod.yml`; php-fpm images (Auth, Product, Order) need `fpm-sidecar/nginx.conf` in front.
+- Background workers every service needs: `../Infrastructure/DEPLOYMENT.md`.
 - Never commit certificates, private keys or `.env` files.

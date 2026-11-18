@@ -1,0 +1,119 @@
+_format_version: "3.0"
+
+# ---------------------------------------------------------------------------
+# PRODUCTION routes: same table as kong.yml, only the upstream URLs differ.
+# TODO: replace the hostnames with your real service addresses (Kubernetes
+# Service names, e.g. http://auth-service.ecomms.svc.cluster.local:8080).
+# Every upstream must speak HTTP. Auth/Product/Order images run php-fpm
+# (FastCGI :9000) only: put fpm-sidecar/nginx.conf in front of them (see README).
+# Mount this file instead of kong.yml:  KONG_DECLARATIVE_CONFIG=/kong/kong.prod.yml
+# ---------------------------------------------------------------------------
+
+services:
+  # ======================= AuthService (auth) =======================
+  - name: auth-service
+    url: http://auth-service:8080
+    routes:
+      - name: auth-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/auth
+          - /api/staff
+          - /api/roles
+          - /api/permissions
+
+  # ====================== ProductService ======================
+  - name: product-service
+    url: http://product-service:8080
+    routes:
+      - name: product-public-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/categories
+          - /api/products
+      - name: product-admin-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/admin/products
+          - /api/admin/categories
+          - /api/admin/attributes
+          - /api/admin/attribute-values
+          - /api/admin/brands
+          - /api/admin/variants
+          - /api/admin/images
+
+  # ===================== InventoryService =====================
+  - name: inventory-service
+    url: http://inventory-service:8080
+    routes:
+      - name: inventory-public-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/availability
+      - name: inventory-admin-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/admin/inventory
+          - /api/admin/warehouses
+          - /api/admin/stock
+          - /api/admin/movements
+          - /api/admin/alerts
+          - /api/admin/reservations
+          - /api/admin/reports
+          - /api/admin/suppliers
+          - /api/admin/purchase-orders
+    # /api/admin/inventory/* = inventory pre-order dashboard + stock-return log
+    # (/api/admin/preorders and /api/admin/returns belong to OrderService)
+
+  # ====================== OrderService ======================
+  - name: order-service
+    url: http://order-service:8080
+    routes:
+      - name: order-customer-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/cart
+          - /api/checkout
+          - /api/orders
+          - /api/preorders
+          - /api/returns
+      - name: order-payment-webhook
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/payments/webhook
+      - name: order-admin-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/admin/orders
+          - /api/admin/preorders
+          - /api/admin/payments
+          - /api/admin/fulfillments
+          - /api/admin/returns
+          - /api/admin/refunds
+    # /api/payments/webhook: called by the payment provider (no JWT; HMAC X-Signature).
+
+  # =================== NotificationService ===================
+  - name: notification-service
+    url: http://notification-service:8080
+    routes:
+      - name: notification-customer-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/notifications
+          - /api/notification-preferences
+      - name: notification-admin-routes
+        strip_path: false
+        preserve_host: true
+        paths:
+          - /api/admin/notifications
+          - /api/admin/notification-templates
+          - /api/admin/notification-deliveries
