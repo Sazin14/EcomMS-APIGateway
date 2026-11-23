@@ -19,6 +19,7 @@ services:
         preserve_host: true
         paths:
           - /api/auth
+          - /api/customers
           - /api/staff
           - /api/roles
           - /api/permissions
