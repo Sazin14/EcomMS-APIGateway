@@ -105,6 +105,8 @@ services:
           - /api/admin/fulfillments
           - /api/admin/returns
           - /api/admin/refunds
+          - /api/admin/promotions
+          - /api/admin/banners
     # /api/payments/webhook: called by the payment provider (no JWT; HMAC X-Signature).
 
   # =================== NotificationService ===================
