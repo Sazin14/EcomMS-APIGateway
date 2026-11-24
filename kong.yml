@@ -50,6 +50,7 @@ services:
           - /api/admin/brands
           - /api/admin/variants
           - /api/admin/images
+          - /api/admin/reviews
 
   # ===================== InventoryService =====================
   - name: inventory-service
