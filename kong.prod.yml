@@ -24,6 +24,7 @@ services:
           - /api/roles
           - /api/permissions
           - /api/activity-logs
+          - /api/settings
 
   # ====================== ProductService ======================
   - name: product-service
